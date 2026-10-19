@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.vscode/
+.env
+.vercel/
+# dataset (downloaded by 00_download.py) - only the top-level folder; demo/data/ is the dashboard's sample
+/data/
+# full-size fine-tuned models and topic files (the web app uses the compressed copies in demo/models/)
+/models/

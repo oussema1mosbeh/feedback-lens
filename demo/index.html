@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback Lens</title>
+<meta name="description" content="AI customer feedback analyzer: sentiment, automatically discovered issues, trends and real quotes. Upload your own reviews; they never leave your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Executive navy: deep navy for structure, white surfaces, coral for action,
+   green / amber / red reserved for sentiment so colour always means something. */
+:root{--navy:#0B1F3A;--navy2:#132B4D;--ink:#0B1F3A;--text:#33415C;--mut:#6B7891;--line:#E3E8F0;--bg:#F4F6FA;--white:#FFFFFF;
+  --coral:#FF6B4A;--coral2:#F2552F;--pos:#2BB673;--neu:#F5A524;--neg:#E5484D;
+  --sans:'Manrope',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--ease:cubic-bezier(.16,1,.3,1);--r:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{font-family:var(--sans);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+button,select,input{font:inherit;color:inherit}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- top navigation ---------- */
+.nav{background:var(--navy);color:#fff}
+.nav .in{max-width:1240px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.logo svg{width:28px;height:28px}
+.logo small{display:block;font-weight:500;font-size:11.5px;color:rgba(255,255,255,.6);letter-spacing:0}
+.nav .sp{flex:1}
+.source{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.08);font-size:12.5px;color:rgba(255,255,255,.85)}
+.source i{width:7px;height:7px;border-radius:50%;background:var(--pos);box-shadow:0 0 0 3px rgba(43,182,115,.25)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--white);border-radius:10px;padding:9px 14px;font-weight:600;font-size:13.5px;cursor:pointer;transition:background .2s,border-color .2s,transform .2s var(--ease),box-shadow .2s}
+.btn:hover{border-color:#C9D2E0;transform:translateY(-1px)}
+.btn svg{width:16px;height:16px}
+.btn.coral{background:var(--coral);border-color:var(--coral);color:#fff;box-shadow:0 6px 16px -8px rgba(255,107,74,.8)}
+.btn.coral:hover{background:var(--coral2)}
+.btn.ghost{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);color:#fff}
+.btn.ghost:hover{background:rgba(255,255,255,.14)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
+
+/* ---------- page header + filters ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 56px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.head h1{font-size:clamp(26px,3.2vw,36px);font-weight:800;color:var(--ink);letter-spacing:-.025em;line-height:1.1}
+.head p{color:var(--mut);margin-top:6px;font-size:15px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters label{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.select{appearance:none;background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%236B7891' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border:1px solid var(--line);border-radius:10px;padding:9px 34px 9px 12px;font-weight:600;font-size:13.5px;color:var(--ink);cursor:pointer}
+.active-filter{display:none;align-items:center;gap:6px;padding:6px 8px 6px 12px;border-radius:99px;background:#FFF0EB;color:var(--coral2);font-size:13px;font-weight:600}
+.active-filter.on{display:inline-flex}
+.active-filter button{border:0;background:none;cursor:pointer;color:inherit;font-size:16px;line-height:1;padding:0 4px}
+
+/* ---------- KPI cards ---------- */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:22px}
+.kpi{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
+.kpi .l{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-family:var(--mono);font-size:28px;font-weight:500;color:var(--ink);margin-top:6px;line-height:1.1;letter-spacing:-.02em}
+.kpi .v.txt{font-family:var(--sans);font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.25}
+.kpi .s{font-size:12.5px;color:var(--mut);margin-top:4px}
+.kpi.alert{border-color:#FFD0C4;background:linear-gradient(180deg,#FFF6F3,#fff)}
+.kpi.alert:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--coral)}
+.up{color:var(--neg);font-weight:700}.down{color:var(--pos);font-weight:700}
+
+/* ---------- cards ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;margin-top:16px;align-items:start}
+.card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.card h2{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.card .sub{font-size:13px;color:var(--mut);margin-top:2px}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--mut);flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px}
+
+/* key insights */
+.insights{margin-top:16px}
+.insights ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.insights li{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:var(--bg);font-size:14px;color:var(--text);cursor:pointer;
+  border:1px solid transparent;transition:border-color .2s,background .2s,transform .2s var(--ease);animation:qin .4s var(--ease) both}
+.insights li:hover{border-color:#FFD0C4;background:#FFF6F3;transform:translateY(-1px)}
+.insights li b{color:var(--ink);font-weight:700}
+.insights .ic{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:#fff;box-shadow:0 1px 0 var(--line)}
+.issue .gen{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);background:var(--bg);border-radius:99px;padding:2px 7px}
+
+/* issues list */
+.issue{display:grid;grid-template-columns:minmax(0,1fr) 92px 64px;gap:14px;align-items:center;padding:11px 10px;margin:0 -10px;border-radius:10px;cursor:pointer;transition:background .15s}
+.issue:hover{background:var(--bg)}
+.issue.sel{background:#FFF0EB;box-shadow:inset 3px 0 0 var(--coral)}
+.issue .name{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--ink);font-size:14px}
+.issue .name .rank{font-family:var(--mono);font-size:11.5px;color:var(--mut);width:18px}
+.issue .rename{opacity:0;border:0;background:none;cursor:pointer;color:var(--mut);padding:2px;border-radius:6px;transition:opacity .15s}
+.issue:hover .rename{opacity:1}
+.issue .rename:hover{color:var(--ink);background:#E9EDF4}
+.issue .kw{font-size:12px;color:var(--mut);margin:2px 0 6px 26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.issue .bar{margin-left:26px;height:6px;border-radius:6px;background:var(--bg);overflow:hidden}
+.issue .bar b{display:block;height:100%;border-radius:6px;background:var(--navy2);transform-origin:left;transition:transform .7s var(--ease)}
+.issue.sel .bar b{background:var(--coral)}
+.issue .spark{width:92px;height:30px}
+.issue .stat{text-align:right}
+.issue .stat b{display:block;font-family:var(--mono);font-weight:500;color:var(--ink);font-size:14px}
+.issue .stat span{font-size:11.5px}
+.issue input{font-weight:700;font-size:14px;color:var(--ink);border:1px solid var(--coral);border-radius:6px;padding:2px 6px;width:100%;max-width:260px;outline:0}
+
+/* time chart */
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--mono);font-size:10.5px;fill:var(--mut)}
+.tip{position:fixed;pointer-events:none;z-index:30;background:var(--navy);color:#fff;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.55;max-width:280px;box-shadow:0 10px 30px -10px rgba(11,31,58,.5);opacity:0;transition:opacity .18s ease}
+.tip b{font-family:var(--mono);font-weight:500}
+
+/* quotes */
+.quotes{position:sticky;top:16px}
+.search{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 36px;font-size:13.5px;outline:0;
+  background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='5' fill='none' stroke='%236B7891' stroke-width='1.6'/%3E%3Cpath d='M11 11l3.5 3.5' stroke='%236B7891' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat 12px center}
+.search:focus{border-color:var(--coral);box-shadow:0 0 0 3px rgba(255,107,74,.15)}
+.qlist{margin-top:12px;max-height:640px;overflow:auto;display:grid;gap:10px;padding-right:4px}
+.q{border:1px solid var(--line);border-radius:12px;padding:12px 14px;animation:qin .35s var(--ease) both}
+.q .meta{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--mut);margin-bottom:6px;flex-wrap:wrap}
+.q .co{font-weight:700;color:var(--ink)}
+.q .sent{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.q .sent i{width:7px;height:7px;border-radius:50%}
+.q .tag{margin-left:auto;padding:2px 8px;border-radius:99px;background:var(--bg);font-weight:600}
+.q p{font-size:14px;color:var(--text)}
+.q p .at{color:#9AA6BA}
+.q mark{background:#FFE3DA;color:inherit;border-radius:3px;padding:0 1px}
+.empty{padding:28px;text-align:center;color:var(--mut);font-size:14px;border:1px dashed var(--line);border-radius:12px}
+
+/* heatmap */
+.heat{overflow-x:auto;overflow-y:hidden}
+.heat table{border-collapse:separate;border-spacing:3px;width:100%;min-width:560px}
+.heat th{font-size:12px;font-weight:700;color:var(--mut);text-align:center;padding:4px 6px;white-space:nowrap}
+.heat th:first-child{text-align:left}
+.heat td{text-align:center;font-family:var(--mono);font-size:12.5px;border-radius:7px;padding:9px 4px;color:var(--ink);transition:box-shadow .15s,filter .15s}
+.heat td:first-child{font-family:var(--sans);font-weight:700;text-align:left;font-size:13px;white-space:nowrap;padding-left:2px}
+.heat td.cell{cursor:pointer;outline:0}
+/* no zoom on hover: scaling the edge cells pushed them outside the table and flashed a scrollbar */
+.heat td.cell:hover,.heat td.cell:focus-visible{box-shadow:inset 0 0 0 2px var(--coral)}
+/* calm table: navy scale, generous spacing, the row you hover is gently highlighted */
+.heat table{border-spacing:5px 4px}
+.heat th{font-size:11.5px;letter-spacing:.04em;color:#7C889E;padding:6px}
+.heat th.on{color:var(--coral2)}
+.heat td{font-size:13px;padding:11px 6px;border-radius:9px}
+.heat td:first-child{color:var(--ink);font-weight:600;padding:11px 10px;border-radius:9px;transition:background .15s}
+.heat tbody tr:hover td:first-child{background:var(--bg)}
+.heat tbody tr:hover td.cell{filter:brightness(.97)}
+.heat td.max{font-weight:700}
+.pin{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--coral);margin-right:6px;vertical-align:1px;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.heatlegend{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--mut)}
+.heatlegend > i{display:block;width:120px;height:8px;border-radius:8px}
+.heatlegend .sep{width:1px;height:14px;background:var(--line);margin:0 6px}
+
+/* method section */
+.method{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.method .card h3{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:6px}
+.method .card p{font-size:13.5px;color:var(--mut)}
+.method table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.method td{padding:6px 0;border-bottom:1px solid var(--line)}
+.method td:last-child{text-align:right;font-family:var(--mono)}
+.method tr.win td{font-weight:700;color:var(--ink)}
+footer{margin-top:22px;font-size:12px;color:var(--mut)}
+
+/* ---------- upload dialog ---------- */
+dialog{margin:auto;border:0;border-radius:18px;padding:0;width:min(560px,calc(100% - 24px));box-shadow:0 30px 80px -20px rgba(11,31,58,.5);color:var(--text)}
+dialog::backdrop{background:rgba(11,31,58,.55);backdrop-filter:blur(3px)}
+.dlg{padding:24px}
+.dlg h2{font-size:20px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.dlg .x{float:right;border:0;background:none;font-size:22px;cursor:pointer;color:var(--mut);line-height:1}
+.drop{margin-top:16px;border:2px dashed #C9D2E0;border-radius:14px;padding:28px 18px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.drop:hover,.drop.over{border-color:var(--coral);background:#FFF6F3}
+.drop b{display:block;color:var(--ink);font-size:15px}
+.drop span{font-size:13px;color:var(--mut)}
+.private{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12.5px;color:var(--mut)}
+.private svg{width:15px;height:15px;color:var(--pos);flex:none}
+.map{display:grid;gap:10px;margin-top:16px}
+.map label{display:grid;grid-template-columns:130px 1fr;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--ink)}
+.map .select{width:100%}
+.range{display:grid;gap:6px;margin-top:14px;font-size:13px;font-weight:600;color:var(--ink)}
+.range input{accent-color:var(--coral)}
+.range div{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);font-weight:500}
+.prog{margin-top:18px}
+.prog .step{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);padding:4px 0}
+.prog .step.on{color:var(--ink);font-weight:600}
+.prog .step.done{color:var(--pos)}
+.prog .track{height:6px;border-radius:6px;background:var(--bg);overflow:hidden;margin-top:8px}
+.prog .track b{display:block;height:100%;width:0;background:var(--coral);transition:width .2s}
+.note{font-size:12.5px;color:var(--mut);margin-top:10px}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+
+/* ================= redesign: executive summary band ================= */
+.band{position:relative;background:radial-gradient(70% 120% at 85% 0%,#1C3B66 0%,transparent 60%),var(--navy);color:#fff;padding-bottom:84px;overflow:hidden}
+.band:after{content:"";position:absolute;inset:auto 0 0 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)}
+.nav{background:transparent;border-bottom:1px solid rgba(255,255,255,.08)}
+.bandin{padding-top:30px;padding-bottom:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--coral);margin-bottom:8px}
+.band .head h1{color:#fff;font-size:clamp(28px,3.4vw,40px)}
+.band .head p#subtitle{color:rgba(255,255,255,.62)}
+.band .filters label{color:rgba(255,255,255,.55)}
+.band .select{background-color:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#fff;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%23ffffff' stroke-width='1.6'/%3E%3C/svg%3E")}
+.band .select option{color:var(--ink)}
+.band .active-filter{background:rgba(255,107,74,.16);color:#FFB4A2}
+
+/* KPI cards on navy: glassy, white numbers */
+.band .kpis{grid-template-columns:1.35fr repeat(4,1fr);margin-top:26px}
+.band .kpi{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px)}
+.band .kpi .l{color:rgba(255,255,255,.55)}
+.band .kpi .v{color:#fff}
+.band .kpi .s{color:rgba(255,255,255,.55)}
+.band .kpi.alert{background:linear-gradient(160deg,rgba(255,107,74,.22),rgba(255,107,74,.06));border-color:rgba(255,107,74,.45)}
+.band .up{color:#FF9C85}.band .down{color:#6EDFA6}
+.mix{display:flex;height:10px;border-radius:10px;overflow:hidden;gap:2px;margin-top:12px}
+.mix span{height:100%;border-radius:2px;transition:width .8s var(--ease)}
+.mixleg{display:flex;gap:12px;margin-top:8px;font-size:12px;color:rgba(255,255,255,.7);flex-wrap:wrap}
+.mixleg b{font-family:var(--mono);font-weight:500;color:#fff}
+.mixleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+
+/* AI summary overlaps the band */
+.wrap{padding-top:0}
+.insights{position:relative;z-index:2;margin-top:-56px;box-shadow:0 24px 50px -28px rgba(11,31,58,.35)}
+.insights h2{display:flex;align-items:center;gap:8px}
+.ai{display:inline-grid;place-items:center;height:20px;padding:0 7px;border-radius:6px;background:linear-gradient(135deg,var(--coral),#FF9A5A);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em}
+.insights ul{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.insights li{flex-direction:column;gap:10px;padding:16px;background:var(--white);border:1px solid var(--line);border-radius:12px}
+.insights li:hover{border-color:var(--coral);background:var(--white);box-shadow:0 10px 24px -16px rgba(255,107,74,.6)}
+.insights .top{display:flex;align-items:center;justify-content:space-between;width:100%}
+.insights .metric{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1}
+.insights .ic{width:32px;height:32px;border-radius:10px;box-shadow:none}
+.insights .ic svg{width:17px;height:17px}
+.insights .go{margin-top:auto;font-size:12px;font-weight:700;color:var(--coral2);opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s var(--ease)}
+.insights li:hover .go{opacity:1;transform:none}
+
+/* balanced grid: issues | chart + quotes */
+.grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.side{display:grid;gap:16px;align-content:start}
+.quotes{position:static}
+.qlist{max-height:470px}
+.card{box-shadow:0 1px 2px rgba(11,31,58,.04)}
+.issue .bar b{background:#9FB1CC}
+.issue:hover .bar b{background:var(--navy2)}
+.more{display:block;width:100%;margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;background:none;font-weight:700;font-size:13px;color:var(--navy2);cursor:pointer}
+.more:hover{border-color:var(--navy2);background:var(--bg)}
+.qlist::-webkit-scrollbar{width:8px}.qlist::-webkit-scrollbar-thumb{background:#D6DDE8;border-radius:8px}.qlist::-webkit-scrollbar-track{background:transparent}
+.qlist{scrollbar-width:thin;scrollbar-color:#D6DDE8 transparent}
+.heat-card{margin-top:16px}
+.method .card{background:transparent;border-style:dashed;box-shadow:none}
+
+@media (max-width:1180px){.band .kpis{grid-template-columns:repeat(3,1fr)}.band .kpis .kpi:first-child{grid-column:span 3}}
+@media (max-width:640px){.band .kpis{grid-template-columns:repeat(2,1fr)}.band .kpis .kpi:first-child,.band .kpis .kpi:nth-child(4),.band .kpis .kpi:last-child{grid-column:span 2}.insights{margin-top:-40px}.band{padding-bottom:64px}}
+@media print{.band{background:var(--navy);-webkit-print-color-adjust:exact;print-color-adjust:exact}.insights{margin-top:16px}}
+
+.spark rect{transform-box:fill-box;transform-origin:50% 100%;animation:barup .7s var(--ease) both}
+
+/* smooth chart: columns rise, the curve draws itself, the soft area fades in */
+.chart .bars rect{transform-box:fill-box;transform-origin:50% 100%;animation:barup .9s var(--ease) both;transition:fill .2s}
+.chart .curve{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.4s var(--ease) .35s forwards}
+.chart .area{opacity:0;animation:appear .9s ease .8s forwards}
+.chart .dot,.chart .guide{transition:opacity .15s,cx .12s ease-out,cy .12s ease-out}
+.chart text{fill:#A3AEC0}
+.tip{border-radius:12px;padding:10px 13px;background:rgba(11,31,58,.94);backdrop-filter:blur(6px)}
+@keyframes barup{from{transform:scaleY(0)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes appear{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.chart .curve{stroke-dashoffset:0}.chart .area{opacity:1}}
+
+@keyframes qin{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:1080px){.grid{grid-template-columns:1fr!important}.quotes{position:static}.method{grid-template-columns:1fr}}
+@media (max-width:640px){.source{display:none}
+  .issue{grid-template-columns:minmax(0,1fr) 58px}.issue .sparkcell{display:none}.map label{grid-template-columns:1fr}}
+@media print{.nav .btn,.filters,.search,dialog,.method{display:none!important}body{background:#fff}.card,.kpi{break-inside:avoid}.grid{grid-template-columns:1fr}.qlist{max-height:none}}
+</style>
+</head>
+<body>
+<div class="band">
+<header class="nav">
+  <div class="in">
+    <div class="logo">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#FF6B4A"/><circle cx="12.5" cy="12.5" r="5.5" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M16.5 16.5L21 21" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <div>Feedback Lens<small>AI customer feedback analyzer</small></div>
+    </div>
+    <span class="sp"></span>
+    <span class="source"><i></i><span id="sourceText">Sample data</span></span>
+    <button class="btn ghost" id="exportBtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M3 13h10"/></svg>Export</button>
+    <button class="btn coral" id="uploadBtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13V5M4.5 8.5L8 5l3.5 3.5M3 3h10"/></svg>Upload your reviews</button>
+  </div>
+</header>
+  <div class="wrap bandin">
+    <div class="head">
+      <div>
+        <p class="eyebrow">Customer feedback report</p>
+        <h1>What are your customers really saying?</h1>
+        <p id="subtitle">Loading…</p>
+      </div>
+      <div class="filters">
+        <label for="company">Company</label>
+        <select class="select" id="company"></select>
+        <span class="active-filter" id="topicFilter"><span id="topicFilterName"></span><button aria-label="Clear issue filter">×</button></span>
+      </div>
+    </div>
+    <section class="kpis" id="kpis" aria-label="Key numbers"></section>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="card insights" aria-label="AI summary">
+    <div class="ch"><div><h2><span class="ai">AI</span>Summary</h2><p class="sub">Written automatically from the analysis. Click a finding to see the messages behind it.</p></div></div>
+    <ul id="insights"></ul>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="ch"><div><h2>Top issues</h2><p class="sub">Grouped automatically by meaning. Click one to read what customers wrote.</p></div></div>
+      <div id="issues"></div>
+      <button class="more" id="more" hidden></button>
+    </section>
+    <div class="side">
+      <section class="card chart">
+        <div class="ch"><div><h2>Volume &amp; mood over time</h2><p class="sub" id="chartSub">Messages per day, and how many are complaints</p></div>
+          <div class="legend"><span><i style="background:#C9D4E5"></i><span id="barLegend">Messages</span></span><span><i style="background:var(--neg);height:3px"></i><span id="lineLegend">Complaints</span></span></div></div>
+        <div id="chart"></div>
+      </section>
+    <section class="card quotes">
+      <div class="ch"><div><h2 id="quotesTitle">What customers say</h2><p class="sub" id="quotesSub">Most recent complaints</p></div></div>
+      <input class="search" id="search" type="search" placeholder="Search messages…" aria-label="Search messages">
+      <div class="qlist" id="quotes"></div>
+    </section>
+    </div>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <div class="ch"><div><h2>Compare companies</h2><p class="sub">Share of each company's complaints per issue. Hover a cell for details, click it to read the messages.</p></div></div>
+    <div class="heat" id="heat"></div>
+  </section>
+
+  <section class="method">
+    <div class="card"><h3>1 · Sentiment</h3><p>A DistilBERT transformer fine-tuned on 11,500 labelled customer messages reads each one as negative, neutral or positive.</p>
+      <table><tr><td>Word counting (baseline)</td><td>72.1%</td></tr><tr class="win"><td>Fine-tuned DistilBERT</td><td>77.7%</td></tr></table><p style="margin-top:6px;font-size:12px">Macro F1 on 1,399 test messages</p></div>
+    <div class="card"><h3>2 · Issues, found automatically</h3><p>Each complaint becomes a 384-number "meaning" vector; similar meanings are grouped and named from their most distinctive words. No list of topics is given in advance, so it works on any business's reviews.</p>
+      <table><tr><td>Word-based grouping</td><td>NMI 0.18</td></tr><tr class="win"><td>Meaning-based grouping</td><td>NMI 0.25</td></tr></table><p style="margin-top:6px;font-size:12px">Agreement with human complaint labels</p></div>
+    <div class="card"><h3>3 · Private by design</h3><p>Both models run inside your browser. When you upload a file, your customers' messages are analysed on your computer and never sent anywhere.</p>
+      <p style="margin-top:10px"><b style="color:var(--ink)">Limits:</b> English only, sarcasm can fool it, and topic names are suggestions: rename them to your words.</p></div>
+  </section>
+  <footer>Sample data: Twitter US Airline Sentiment (CrowdFlower "Data for Everyone"), CC BY-NC-SA 4.0. 14,295 customer messages to 6 US airlines, Feb 2015. Sentiment and issues shown are the model's predictions.</footer>
+</main>
+
+<div class="tip" id="tip"></div>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <button class="x" id="dlgClose" aria-label="Close">×</button>
+    <h2>Analyse your own reviews</h2>
+    <p class="note" style="margin-top:6px">Upload a CSV file with one review per row. Up to 2,000 reviews are analysed.</p>
+    <div id="stepFile">
+      <label class="drop" id="drop"><input type="file" id="file" accept=".csv,text/csv" hidden><b>Drop a CSV file here</b><span>or click to choose a file</span></label>
+      <p class="private"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg>Your file stays on your computer. The AI runs in this browser tab.</p>
+    </div>
+    <div id="stepMap" hidden>
+      <p class="note" id="fileInfo"></p>
+      <div class="map">
+        <label>Review text <select class="select" id="colText"></select></label>
+        <label>Date (optional) <select class="select" id="colDate"></select></label>
+        <label>Company / product (optional) <select class="select" id="colCo"></select></label>
+      </div>
+      <div class="range"><span>Number of issues: <b id="kVal">10</b></span><input type="range" id="k" min="5" max="15" value="10"><div><span>Broader</span><span>More detailed</span></div></div>
+      <div class="prog" id="prog" hidden>
+        <div class="step" data-s="load"><span>Loading the AI models (about 90 MB, once)</span><span class="num"></span></div>
+        <div class="step" data-s="sent"><span>Reading sentiment</span><span class="num"></span></div>
+        <div class="step" data-s="emb"><span>Understanding meaning</span><span class="num"></span></div>
+        <div class="step" data-s="group"><span>Grouping issues</span><span class="num"></span></div>
+        <div class="track"><b id="progBar"></b></div>
+      </div>
+      <div class="actions"><button class="btn" id="back">Choose another file</button><button class="btn coral" id="analyse">Analyse</button></div>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script type="module">
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
+env.localModelPath = new URL("./models/", location.href).href;
+
+const $ = id => document.getElementById(id);
+const SENT = ["negative", "neutral", "positive"], SCOL = ["var(--neg)", "var(--neu)", "var(--pos)"];
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = n => n.toLocaleString("en");
+const pct = (a, b) => b ? a / b * 100 : 0;
+let D = null;                                   // the current dataset
+const state = { company: -1, topic: -1, search: "" };
+
+// ===================== data =====================
+async function loadSample() {
+  const j = await (await fetch("data/airlines.json")).json();
+  const t0 = new Date(j.meta.start).getTime();
+  D = { label: j.meta.label, source: `Sample data · ${fmt(j.meta.messages)} airline messages`, companies: j.companies,
+        topics: j.topics.map(t => ({ ...t })), sample: true,
+        rows: j.rows.map(r => ({ c: r[0], t: t0 + r[1] * 60000, s: r[2], conf: r[3], topic: r[4], text: r[5] })) };
+  start();
+}
+
+function start() {
+  state.company = -1; state.topic = -1; state.search = ""; $("search").value = "";
+  $("sourceText").textContent = D.source;
+  $("company").innerHTML = `<option value="-1">All ${D.companies.length ? "companies" : ""}</option>` + D.companies.map((c, i) => `<option value="${i}">${esc(c)}</option>`).join("");
+  $("company").disabled = D.companies.length < 2;
+  render();
+}
+
+// time buckets: days for short ranges, weeks or months for longer ones
+function bucketer(rows) {
+  const ts = rows.map(r => r.t).filter(Boolean), min = Math.min(...ts), max = Math.max(...ts), days = (max - min) / 864e5;
+  const unit = days > 400 ? "month" : days > 70 ? "week" : "day";
+  const key = t => { const d = new Date(t); if (unit === "month") return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (unit === "week") { const m = new Date(d); m.setDate(d.getDate() - ((d.getDay() + 6) % 7)); d.setTime(m.getTime()); }
+    return d.toISOString().slice(0, 10); };
+  const keys = [...new Set(ts.map(key))].sort();
+  const label = k => unit === "month" ? new Date(k + "-01").toLocaleDateString("en", { month: "short", year: "2-digit" })
+                                      : new Date(k).toLocaleDateString("en", { day: "numeric", month: "short" });
+  return { unit, key, keys, label, hasTime: ts.length > 0 };
+}
+
+// ===================== render =====================
+function filtered() { return D.rows.filter(r => state.company < 0 || r.c === state.company); }
+
+function render() {
+  const rows = filtered(), complaints = rows.filter(r => r.s === 0 && r.topic >= 0);
+  const B = bucketer(rows);
+  const scope = state.company < 0 ? D.label : `${D.companies[state.company]} · ${D.label.toLowerCase()}`;
+  $("subtitle").textContent = `${scope} · ${fmt(rows.length)} messages analysed by AI`;
+
+  // issue stats
+  const byTopic = new Map(D.topics.map(t => [t.id, []]));
+  complaints.forEach(r => byTopic.get(r.topic)?.push(r));
+  const k3 = B.keys.length ? B.keys[Math.max(0, Math.floor(B.keys.length * 2 / 3))] : null;     // last third of the period = "recent"
+  const issues = D.topics.map(t => {
+    const list = byTopic.get(t.id) || [];
+    const recentAll = complaints.filter(r => k3 && B.key(r.t) >= k3).length, earlierAll = complaints.length - recentAll;
+    const recent = list.filter(r => k3 && B.key(r.t) >= k3).length, earlier = list.length - recent;
+    const trend = recentAll && earlierAll ? pct(recent, recentAll) - pct(earlier, earlierAll) : 0;
+    // the issue's SHARE of each day's complaints (raw counts would make every line spike on busy days)
+    // days with very few complaints (e.g. a partial first day) are skipped: a share of 3 messages means nothing
+    const spark = B.keys.map(k => { const day = complaints.filter(r => B.key(r.t) === k);
+      return day.length >= 20 ? day.filter(r => r.topic === t.id).length / day.length : null; }).filter(v => v !== null);
+    return { ...t, n: list.length, share: pct(list.length, complaints.length), trend, spark };
+  }).filter(i => i.n > 0).sort((a, b) => b.n - a.n);
+
+  renderKpis(rows, complaints, issues, B);
+  renderInsights(rows, issues, B);
+  renderIssues(issues, B);
+  renderChart(rows, B);
+  renderQuotes(rows);
+  renderHeat(issues);
+  const tf = $("topicFilter"), sel = D.topics.find(t => t.id === state.topic);
+  tf.classList.toggle("on", !!sel); $("topicFilterName").textContent = sel ? `Issue: ${sel.name}` : "";
+}
+
+function renderKpis(rows, complaints, issues, B) {
+  const n = rows.length, cnt = [0, 1, 2].map(s => rows.filter(r => r.s === s).length);
+  const nss = pct(cnt[2], n) - pct(cnt[0], n);
+  // headline numbers only point at specific, fixable problems (not general venting)
+  const specific = issues.filter(i => !i.general);
+  const top = specific[0], rising = specific.filter(i => i.n >= 20 && B.keys.length > 2).sort((a, b) => b.trend - a.trend)[0];
+  const share = s => pct(cnt[s], n);
+  $("kpis").innerHTML = `
+    <div class="kpi"><div class="l">Sentiment mix · ${fmt(n)} messages</div>
+      <div class="mix" aria-hidden="true">${[0, 1, 2].map(s => `<span style="width:calc(${share(s).toFixed(1)}% - 2px);background:${SCOL[s]}"></span>`).join("")}</div>
+      <div class="mixleg">${[0, 1, 2].map(s => `<span><i style="background:${SCOL[s]}"></i>${SENT[s]} <b>${share(s).toFixed(0)}%</b></span>`).join("")}</div>
+      <div class="s" style="margin-top:6px">${B.hasTime ? `${B.label(B.keys[0])} – ${B.label(B.keys.at(-1))}` : "no dates in file"}</div></div>
+    <div class="kpi"><div class="l">Complaints</div><div class="v" data-count="${cnt[0]}">0</div><div class="s">${share(0).toFixed(1)}% of messages</div></div>
+    <div class="kpi"><div class="l">Net sentiment</div><div class="v" style="color:${nss < 0 ? "#FF8A8E" : "#6EDFA6"}" data-count="${nss.toFixed(0)}" data-sign="1">0</div><div class="s">% positive − % negative</div></div>
+    <div class="kpi"><div class="l">#1 issue</div><div class="v txt">${top ? esc(top.name) : "—"}</div><div class="s">${top ? `${top.share.toFixed(0)}% of complaints` : ""}</div></div>
+    <div class="kpi alert"><div class="l">Fastest-growing issue</div><div class="v txt">${rising && rising.trend > 0 ? esc(rising.name) : "Nothing rising"}</div>
+      <div class="s">${rising && rising.trend > 0 ? `<span class="up">▲ ${rising.trend.toFixed(1)} pts</span> share of complaints, recent vs earlier` : "Compared with earlier in the period"}</div></div>`;
+  document.querySelectorAll("[data-count]").forEach(countUp);
+}
+
+// Key insights: plain sentences a manager can act on, each linked to its messages
+function renderInsights(rows, issues, B) {
+  const out = [], specific = issues.filter(i => !i.general);
+  const rising = specific.filter(i => i.n >= 20 && i.trend > 1 && B.keys.length > 2).sort((a, b) => b.trend - a.trend)[0];
+  if (rising) out.push({ ic: "trend", metric: `+${rising.trend.toFixed(1)}`, unit: "pts", color: "var(--coral2)", topic: rising.id, html: `<b>${esc(rising.name)}</b> is growing: <b>+${rising.trend.toFixed(1)} pts</b> of all complaints in the most recent ${B.unit}s.` });
+
+  if (D.companies.length > 1) {
+    // which company suffers from an issue much more than the others?
+    const comp = D.rows.filter(r => r.s === 0 && r.topic >= 0);
+    const cands = [];
+    D.companies.forEach((name, c) => {
+      if (state.company >= 0 && c !== state.company) return;
+      const mine = comp.filter(r => r.c === c), others = comp.filter(r => r.c !== c);
+      specific.forEach(i => {
+        const a = mine.filter(r => r.topic === i.id).length, b = others.filter(r => r.topic === i.id).length;
+        if (a < 15) return;
+        const sa = pct(a, mine.length), sb = pct(b, others.length);
+        if (sb > 0 && sa / sb >= 1.4) cands.push({ c, i, ratio: sa / sb, sa, sb });
+      });
+    });
+    cands.sort((x, y) => y.ratio - x.ratio).slice(0, 2).forEach(x => out.push({ ic: "company", metric: `${x.ratio.toFixed(1)}×`, color: "var(--navy)", company: x.c, topic: x.i.id,
+      html: `<b>${esc(D.companies[x.c])}</b> customers complain about <b>${esc(x.i.name)}</b> ${x.ratio.toFixed(1)}× more than other companies' (${x.sa.toFixed(0)}% vs ${x.sb.toFixed(0)}%).` }));
+
+    if (state.company < 0) {
+      const neg = D.companies.map((name, c) => { const g = D.rows.filter(r => r.c === c); return { c, name, share: pct(g.filter(r => r.s === 0).length, g.length), n: g.length }; }).filter(x => x.n >= 50).sort((a, b) => b.share - a.share);
+      if (neg.length > 1) out.push({ ic: "scale", metric: `${neg[0].share.toFixed(0)}%`, color: "var(--neg)", company: neg[0].c, html: `<b>${esc(neg[0].name)}</b> has the most negative feedback (${neg[0].share.toFixed(0)}%); <b>${esc(neg.at(-1).name)}</b> the least (${neg.at(-1).share.toFixed(0)}%).` });
+    }
+  }
+  const top = specific[0];
+  if (top && out.length < 4) out.push({ ic: "target", metric: `${top.share.toFixed(0)}%`, color: "var(--navy)", topic: top.id, html: `Fixing <b>${esc(top.name)}</b> would address <b>${top.share.toFixed(0)}%</b> of all complaints, the biggest single specific issue.` });
+  const ICONS = {
+    trend: '<path d="M2 12l4-4 3 3 5-6"/><path d="M10 5h4v4"/>',
+    company: '<rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M6 5h1M9 5h1M6 8h1M9 8h1M7 14v-3h2v3"/>',
+    scale: '<path d="M8 2v12M4 14h8M3 5h10M3 5l-2 4h4zM13 5l-2 4h4z"/>',
+    target: '<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/>',
+  };
+  const tint = c => c === "var(--neg)" ? "#FDECEC" : c === "var(--coral2)" ? "#FFF0EB" : "#EAF0F8";
+  $("insights").innerHTML = out.map((x, k) => `<li data-k="${k}" style="animation-delay:${k * 70}ms" tabindex="0" role="button">
+      <div class="top"><span class="metric" style="color:${x.color}">${x.metric}${x.unit ? ` <small style="font-size:13px">${x.unit}</small>` : ""}</span>
+        <span class="ic" style="background:${tint(x.color)};color:${x.color}" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[x.ic]}</svg></span></div>
+      <span>${x.html}</span><span class="go">See the messages →</span></li>`).join("")
+    || `<li>Not enough data for insights yet.</li>`;
+  $("insights").onclick = e => { const li = e.target.closest("li[data-k]"); if (!li) return; const x = out[+li.dataset.k];
+    if (x.company != null) { state.company = x.company; $("company").value = x.company; }
+    state.topic = x.topic ?? -1; render(); $("quotes").closest(".card").scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "start" }); };
+  $("insights").onkeydown = e => { if (e.key === "Enter") e.target.click(); };
+}
+
+function countUp(el) {
+  const end = parseFloat(el.dataset.count), dec = (el.dataset.count.split(".")[1] || "").length, suf = el.dataset.suffix || "";
+  const show = v => el.textContent = (el.dataset.sign && v > 0 ? "+" : "") + (dec ? v.toFixed(dec) : fmt(Math.round(v))) + suf;
+  if (RM) return show(end);
+  const t0 = performance.now();
+  (function tick(t) { const k = Math.min(1, (t - t0) / 700); show(end * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); })(t0);
+}
+
+// A smooth curve through points that never overshoots (monotone cubic interpolation),
+// so a gentle wave never invents a peak or dip that isn't in the data.
+function smoothPath(p) {
+  if (p.length < 2) return "";
+  const n = p.length, m = [], t = [];
+  for (let i = 0; i < n - 1; i++) m.push((p[i + 1][1] - p[i][1]) / (p[i + 1][0] - p[i][0]));
+  for (let i = 0; i < n; i++) t.push(i === 0 ? m[0] : i === n - 1 ? m[n - 2] : m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2);
+  let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = (p[i + 1][0] - p[i][0]) / 3;
+    d += `C${(p[i][0] + dx).toFixed(1)},${(p[i][1] + t[i] * dx).toFixed(1)} ${(p[i + 1][0] - dx).toFixed(1)},${(p[i + 1][1] - t[i + 1] * dx).toFixed(1)} ${p[i + 1][0].toFixed(1)},${p[i + 1][1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// Catmull-Rom spline: bends gently THROUGH every point, with no flat tops or sharp turns
+function softPath(p) {
+  let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// Mini rounded columns: one soft column per day, like a tiny version of the big chart.
+// Heights show the issue's share of each day's complaints; recent days are a little stronger.
+function sparkline(v) {
+  if (v.length < 2) return "";
+  const n = v.length, gap = 2.2, w = (88 - gap * (n - 1)) / n;
+  const lo = Math.min(...v), hi = Math.max(...v), mean = v.reduce((a, b) => a + b, 0) / n;
+  const span = Math.max(hi - lo, mean * .8, 1e-6);                    // stable issues keep even, calm columns
+  const recent = Math.floor(n * 2 / 3);
+  return `<svg class="spark" viewBox="0 0 92 30" aria-hidden="true">${v.map((y, i) => {
+    const h = 6 + (y - lo) / span * 20, x = 2 + i * (w + gap);
+    return `<rect x="${x.toFixed(1)}" y="${(29 - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(2.5, w / 2).toFixed(1)}"
+      fill="currentColor" opacity="${i >= recent ? .9 : .4}" style="animation-delay:${i * 30}ms"/>`; }).join("")}</svg>`;
+}
+
+let showAll = false;
+function renderIssues(all, B) {
+  const max = Math.max(...all.map(i => i.n), 1);
+  const LIMIT = 10, selHidden = all.findIndex(i => i.id === state.topic) >= LIMIT;   // never hide the selected issue
+  const issues = showAll || selHidden ? all : all.slice(0, LIMIT);
+  const more = $("more");
+  more.hidden = all.length <= LIMIT;
+  more.textContent = showAll ? "Show fewer" : `Show all ${all.length} issues`;
+  more.onclick = () => { showAll = !showAll; render(); };
+  $("issues").innerHTML = issues.map((i, k) => `
+    <div class="issue${i.id === state.topic ? " sel" : ""}" data-id="${i.id}" role="button" tabindex="0" aria-pressed="${i.id === state.topic}">
+      <div><div class="name"><span class="rank">${String(k + 1).padStart(2, "0")}</span><span class="nm">${esc(i.name)}</span>
+        ${i.general ? '<span class="gen" title="Venting with no specific problem to fix">general</span>' : ""}
+        <button class="rename" title="Rename this issue" aria-label="Rename ${esc(i.name)}"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z"/></svg></button></div>
+        <div class="kw">${i.keywords.slice(0, 4).map(esc).join(" · ")}</div>
+        <div class="bar"><b style="transform:scaleX(${i.n / max})"></b></div></div>
+      <div class="sparkcell" style="color:${i.trend > 1 ? "var(--neg)" : "#9AA6BA"}">${B.keys.length > 2 ? sparkline(i.spark) : ""}</div>
+      <div class="stat"><b>${fmt(i.n)}</b><span class="${i.trend > 1 ? "up" : i.trend < -1 ? "down" : ""}">${Math.abs(i.trend) > 1 ? (i.trend > 0 ? "▲ " : "▼ ") + Math.abs(i.trend).toFixed(1) : i.share.toFixed(0) + "%"}</span></div>
+    </div>`).join("") || `<div class="empty">No complaints in this selection.</div>`;
+}
+
+function renderChart(rows, B) {
+  const el = $("chart");
+  if (!B.hasTime || B.keys.length < 2) { el.innerHTML = `<div class="empty">Add a date column to see trends over time.</div>`; return; }
+  // The line counts complaints on the SAME scale as the columns, so it always sits inside them and
+  // moves with them. With an issue selected, the line shows that issue's complaints instead.
+  // With an issue selected, the chart zooms in on it: columns = that issue's complaints per day,
+  // and the line traces their trend (on all messages its ~100/day would lie flat at the bottom).
+  const topic = D.topics.find(t => t.id === state.topic);
+  const lineName = topic ? `${topic.name} complaints` : "complaints";
+  $("chartSub").textContent = topic ? `Complaints about ${topic.name.toLowerCase()} per ${B.unit}, and their trend` : `Messages per ${B.unit}, and how many are complaints`;
+  $("barLegend").textContent = topic ? topic.name : "Messages";
+  $("lineLegend").textContent = topic ? "Trend" : "Complaints";
+  const data = B.keys.map(k => {
+    const g = rows.filter(r => B.key(r.t) === k), comp = g.filter(r => r.s === 0);
+    if (!topic) return { k, n: g.length, c: comp.length, neg: pct(comp.length, g.length) };
+    const t = comp.filter(r => r.topic === topic.id).length;
+    return { k, n: t, c: t, neg: pct(t, comp.length) };
+  });
+  const W = 640, H = 230, L = 40, R = 16, T = 14, Bm = 28, iw = W - L - R, ih = H - T - Bm;
+  const maxN = Math.max(...data.map(d => d.n), 1), bw = iw / data.length, base = T + ih;
+  const x = i => L + bw * i + bw / 2, y1 = v => base - v / maxN * ih * .92, y2 = y1;
+  const pts = data.map((d, i) => [x(i), y1(d.c)]);
+  const curve = smoothPath(pts);
+  const every = Math.ceil(data.length / 10), cw = Math.min(bw * .56, 38);
+  const ticks = [maxN / 2, maxN].map(v => Math.round(v));
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Messages and share of negative messages over time">
+    <defs>
+      <linearGradient id="gBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B7C6DC"/><stop offset="1" stop-color="#E6ECF4"/></linearGradient>
+      <linearGradient id="gBarOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FA5C6"/><stop offset="1" stop-color="#D3DCEA"/></linearGradient>
+      <linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E5484D" stop-opacity=".22"/><stop offset="1" stop-color="#E5484D" stop-opacity="0"/></linearGradient>
+    </defs>
+    ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y1(v).toFixed(1)}" y2="${y1(v).toFixed(1)}" stroke="#EDF1F6" stroke-dasharray="3 5"/><text x="${L - 8}" y="${(y1(v) + 3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`).join("")}
+    <line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" stroke="#E3E8F0"/>
+    <g class="bars">${data.map((d, i) => `<rect data-i="${i}" x="${(x(i) - cw / 2).toFixed(1)}" y="${y1(d.n).toFixed(1)}" width="${cw.toFixed(1)}" height="${(base - y1(d.n)).toFixed(1)}" rx="${Math.min(8, cw / 2).toFixed(1)}" fill="url(#gBar)" style="animation-delay:${i * 45}ms"/>`).join("")}</g>
+    <path class="area" d="${curve}L${x(data.length - 1).toFixed(1)},${base}L${x(0).toFixed(1)},${base}Z" fill="url(#gArea)"/>
+    <path class="curve" d="${curve}" pathLength="1" fill="none" stroke="var(--neg)" stroke-width="2.6" stroke-linecap="round"/>
+    ${data.map((d, i) => i % every ? "" : `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${B.label(d.k)}</text>`).join("")}
+    <line class="guide" x1="0" x2="0" y1="${T}" y2="${base}" stroke="#9AA6BA" stroke-dasharray="3 4" opacity="0"/>
+    <circle class="dot" r="5.5" fill="#fff" stroke="var(--neg)" stroke-width="2.6" opacity="0"/>
+    <rect class="hit" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+  </svg>`;
+
+  // hover: a soft guide line and a dot follow the mouse, and the day's column darkens
+  const svg = el.querySelector("svg"), tip = $("tip"), guide = svg.querySelector(".guide"), dot = svg.querySelector(".dot"), bars = svg.querySelectorAll(".bars rect");
+  const hit = svg.querySelector(".hit");
+  hit.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(data.length - 1, Math.floor((sx - L) / bw))), d = data[i];
+    guide.setAttribute("x1", x(i)); guide.setAttribute("x2", x(i)); guide.setAttribute("opacity", 1);
+    dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y1(d.c)); dot.setAttribute("opacity", 1);
+    bars.forEach((b, k) => b.setAttribute("fill", k === i ? "url(#gBarOn)" : "url(#gBar)"));
+    tip.innerHTML = topic
+      ? `${B.label(d.k)}<br><b>${fmt(d.c)}</b> ${esc(lineName.toLowerCase())}<br><b>${d.neg.toFixed(0)}%</b> of that ${B.unit}'s complaints`
+      : `${B.label(d.k)}<br><b>${fmt(d.n)}</b> messages<br><b>${fmt(d.c)}</b> complaints (${d.neg.toFixed(0)}%)`;
+    // keep the popup on screen: flip to the left of the mouse near the right edge
+    tip.style.opacity = 1;
+    const w = tip.offsetWidth, left = e.clientX + 16 + w > innerWidth - 8 ? e.clientX - w - 16 : e.clientX + 16;
+    tip.style.left = Math.max(8, left) + "px"; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight / 2) + "px";
+  });
+  hit.addEventListener("mouseleave", () => { tip.style.opacity = 0; guide.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); bars.forEach(b => b.setAttribute("fill", "url(#gBar)")); });
+}
+
+// ---- typo-tolerant search: "refound" finds "refund" ----
+let vocab = null, vocabFor = null;
+function vocabulary() {          // every word used in the messages, with how often it appears
+  if (vocabFor === D) return vocab;
+  vocab = new Map();
+  D.rows.forEach(r => (r.text.toLowerCase().match(/[a-z']{3,}/g) || []).forEach(w => vocab.set(w, (vocab.get(w) || 0) + 1)));
+  vocabFor = D; return vocab;
+}
+function editDistance(a, b, max) {   // letters to add, remove or change to turn a into b (stops early past max)
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) { cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); best = Math.min(best, cur[j]); }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function correct(q) {             // closest real word for each word of the query (most common wins ties)
+  const V = vocabulary();
+  return q.split(/\s+/).map(w => {
+    if (V.has(w) || w.length < 4) return w;
+    let best = w, bd = w.length > 6 ? 3 : 2, bc = 0;
+    for (const [v, c] of V) { const d = editDistance(w, v, bd); if (d < bd || (d === bd && d <= 2 && c > bc && best !== w)) { best = v; bd = d; bc = c; } }
+    return best;
+  }).join(" ");
+}
+
+function renderQuotes(rows) {
+  const topic = D.topics.find(t => t.id === state.topic);
+  const typed = state.search.trim().toLowerCase();
+  const find = q => rows.filter(r => r.text.toLowerCase().includes(q) && (!topic || r.topic === topic.id));
+  let q = typed, fixed = false;
+  let list = rows.filter(r => topic ? r.topic === topic.id : r.s === 0);
+  if (q) {
+    list = find(q);
+    if (!list.length) { const c = correct(q); if (c !== q && find(c).length) { q = c; list = find(c); fixed = true; } }
+  }
+  list = list.slice().sort((a, b) => b.t - a.t);
+  $("quotesTitle").textContent = topic ? topic.name : q ? "Search results" : "What customers say";
+  const shown = list.length > 40 ? ` · showing the newest 40` : " · newest first";
+  $("quotesSub").innerHTML = fixed
+    ? `Showing results for <b style="color:var(--ink)">${esc(q)}</b> · no messages contain “${esc(typed)}”<br>${fmt(list.length)} matching messages${shown}`
+    : esc(`${fmt(list.length)} ${q ? "matching messages" : topic ? "complaints about this issue" : "complaints"}${shown}`);
+  const hl = s => { let h = esc(s).replace(/(@\w+)/g, '<span class="at">$1</span>');
+    if (q) h = h.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"), "<mark>$1</mark>"); return h; };
+  $("quotes").innerHTML = list.slice(0, 40).map((r, i) => {
+    const t = D.topics.find(x => x.id === r.topic);
+    return `<article class="q" style="animation-delay:${Math.min(i, 10) * 25}ms"><div class="meta">${D.companies.length ? `<span class="co">${esc(D.companies[r.c] ?? "")}</span>` : ""}
+      ${r.t ? `<span>${new Date(r.t).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}</span>` : ""}
+      <span class="sent" style="color:${SCOL[r.s]}"><i style="background:${SCOL[r.s]}"></i>${SENT[r.s]} ${r.conf}%</span>
+      ${t && !topic ? `<span class="tag">${esc(t.name)}</span>` : ""}</div><p>${hl(r.text)}</p></article>`;
+  }).join("") || `<div class="empty">No messages contain “${esc(typed)}”${topic ? ` in ${esc(topic.name)}` : ""}. Try another word.</div>`;
+}
+
+function renderHeat(issues) {
+  const el = $("heat").closest(".card");
+  if (D.companies.length < 2) { el.hidden = true; return; }
+  el.hidden = false;
+  const comp = D.rows.filter(r => r.s === 0 && r.topic >= 0);
+  const totals = D.companies.map((_, c) => comp.filter(r => r.c === c).length);
+  const rowsH = issues.slice(0, 9).map(i => {
+    const counts = D.companies.map((_, c) => comp.filter(r => r.c === c && r.topic === i.id).length);
+    const vals = counts.map((n, c) => pct(n, totals[c]));
+    return { i, counts, vals, max: Math.max(...vals) };
+  });
+  const hi = Math.max(...rowsH.flatMap(r => r.vals), 1);
+  // One calm navy scale: near-white for small shares, deeper blue for big ones (red stays reserved for "negative").
+  const STOPS = [[246, 248, 252], [207, 220, 238], [125, 152, 194], [32, 61, 107]];
+  const shade = t => { const s = Math.min(.999, Math.max(0, t)) * (STOPS.length - 1), i = Math.floor(s), f = s - i;
+    return `rgb(${STOPS[i].map((c, k) => Math.round(c + (STOPS[i + 1][k] - c) * f)).join(",")})`; };
+  $("heat").innerHTML = `<table><thead><tr><th>Issue</th>${D.companies.map((c, k) => `<th class="${k === state.company ? "on" : ""}">${esc(c)}</th>`).join("")}</tr></thead><tbody>
+    ${rowsH.map((r, ri) => `<tr><td>${esc(r.i.name)}</td>${r.vals.map((v, c) => { const t = Math.pow(v / hi, 1.6);   // softer middle: only truly high shares get dark
+      return `<td class="cell${v === r.max && v > 0 ? " max" : ""}" data-r="${ri}" data-c="${c}" tabindex="0" style="background:${shade(t)};color:${t > .62 ? "#fff" : "var(--ink)"}">${v === r.max && v > 0 ? '<i class="pin" aria-hidden="true"></i>' : ""}${v.toFixed(0)}%</td>`; }).join("")}</tr>`).join("")}
+  </tbody></table>
+  <div class="heatlegend"><span>Lower share</span><i style="background:linear-gradient(90deg,${[0, .33, .66, 1].map(shade).join(",")})"></i><span>Higher share</span>
+    <span class="sep"></span><span><i class="pin" aria-hidden="true"></i>Most affected company for that issue</span></div>`;
+
+  // a real popup card for each cell: the numbers, how it compares, and a click opens those messages
+  const tip = $("tip"), table = $("heat").querySelector("table");
+  const info = td => {
+    const r = rowsH[+td.dataset.r], c = +td.dataset.c, v = r.vals[c];
+    const others = D.companies.map((_, k) => k).filter(k => k !== c);
+    const oShare = pct(others.reduce((s, k) => s + r.counts[k], 0), others.reduce((s, k) => s + totals[k], 0));
+    const ratio = oShare ? v / oShare : 0;
+    const cmp = ratio >= 1.15 ? `<span style="color:#FF9C85">${ratio.toFixed(1)}× the other companies</span>`
+              : ratio <= .87 && ratio > 0 ? `<span style="color:#6EDFA6">${(1 / ratio).toFixed(1)}× lower than the others</span>` : "about the same as the others";
+    return `<b style="font-family:var(--sans);font-weight:800">${esc(D.companies[c])} · ${esc(r.i.name)}</b><br>
+      <b>${fmt(r.counts[c])}</b> complaints · <b>${v.toFixed(1)}%</b> of ${esc(D.companies[c])}'s complaints<br>${cmp}
+      <br><span style="opacity:.65;font-size:11.5px">Click to read these messages</span>`;
+  };
+  const place = (e, td) => { const b = td.getBoundingClientRect();
+    tip.innerHTML = info(td); tip.style.opacity = 1;
+    const w = tip.offsetWidth, x = Math.min(innerWidth - w - 12, Math.max(12, b.left + b.width / 2 - w / 2));
+    tip.style.left = x + "px"; tip.style.top = (b.top - tip.offsetHeight - 10) + "px"; };
+  table.onmouseover = e => { const td = e.target.closest("td.cell"); if (td) place(e, td); };
+  table.onmouseleave = () => tip.style.opacity = 0;
+  table.onfocusin = e => { const td = e.target.closest("td.cell"); if (td) place(e, td); };
+  table.onfocusout = () => tip.style.opacity = 0;
+  const open = td => { tip.style.opacity = 0; state.company = +td.dataset.c; $("company").value = state.company;
+    state.topic = rowsH[+td.dataset.r].i.id; render(); $("quotes").closest(".card").scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "start" }); };
+  table.onclick = e => { const td = e.target.closest("td.cell"); if (td) open(td); };
+  table.onkeydown = e => { const td = e.target.closest("td.cell"); if (td && e.key === "Enter") open(td); };
+}
+
+// ===================== interactions =====================
+$("company").onchange = e => { state.company = +e.target.value; render(); };
+$("issues").addEventListener("click", e => {
+  const row = e.target.closest(".issue"); if (!row) return;
+  const id = +row.dataset.id;
+  if (e.target.closest(".rename")) return rename(row, id);
+  if (e.target.closest("input")) return;
+  state.topic = state.topic === id ? -1 : id; render();
+  if (matchMedia("(max-width:1080px)").matches) $("quotes").closest(".card").scrollIntoView({ behavior: RM ? "auto" : "smooth" });
+});
+$("issues").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.classList.contains("issue")) e.target.click(); });
+function rename(row, id) {
+  const t = D.topics.find(x => x.id === id), nm = row.querySelector(".nm");
+  nm.innerHTML = `<input value="${esc(t.name)}" aria-label="New name">`;
+  const inp = nm.querySelector("input"); inp.focus(); inp.select();
+  const done = save => { if (save && inp.value.trim()) t.name = inp.value.trim(); render(); };
+  inp.onkeydown = e => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+  inp.onblur = () => done(true);
+}
+document.querySelector("#topicFilter button").onclick = () => { state.topic = -1; render(); };
+let st; $("search").oninput = e => { clearTimeout(st); st = setTimeout(() => { state.search = e.target.value; renderQuotes(filtered()); }, 150); };
+
+// export: the analysed messages as CSV
+$("exportBtn").onclick = () => {
+  const rows = filtered(), q = s => `"${String(s).replace(/"/g, '""')}"`;
+  const csv = ["company,date,sentiment,confidence,issue,text", ...rows.map(r =>
+    [q(D.companies[r.c] ?? ""), r.t ? new Date(r.t).toISOString().slice(0, 10) : "", SENT[r.s], r.conf, q(D.topics.find(t => t.id === r.topic)?.name ?? ""), q(r.text)].join(","))].join("\n");
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" })), download: "feedback-analysis.csv" });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ===================== upload & live analysis =====================
+const dlg = $("dlg");
+let parsed = null;
+$("uploadBtn").onclick = () => { showStep("file"); dlg.showModal(); };
+$("dlgClose").onclick = () => dlg.close();
+$("back").onclick = () => showStep("file");
+function showStep(s) { $("stepFile").hidden = s !== "file"; $("stepMap").hidden = s !== "map"; $("prog").hidden = true; $("analyse").disabled = false; $("back").disabled = false; }
+const drop = $("drop");
+["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove("over")));
+drop.addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+$("file").onchange = e => e.target.files[0] && readFile(e.target.files[0]);
+$("k").oninput = e => $("kVal").textContent = e.target.value;
+
+function readFile(f) {
+  Papa.parse(f, { header: true, skipEmptyLines: true, complete: res => {
+    const cols = res.meta.fields || [];
+    if (!cols.length || !res.data.length) { alert("This file has no rows or no header line."); return; }
+    parsed = { name: f.name, rows: res.data, cols };
+    const sample = res.data.slice(0, 200);
+    const avgLen = c => sample.reduce((s, r) => s + String(r[c] ?? "").length, 0) / sample.length;
+    const isDate = c => sample.filter(r => r[c] && !isNaN(Date.parse(r[c]))).length > sample.length * .8 && avgLen(c) < 40;
+    const uniq = c => new Set(sample.map(r => r[c])).size;
+    const text = cols.slice().sort((a, b) => avgLen(b) - avgLen(a))[0];
+    const date = cols.find(c => c !== text && isDate(c)) ?? "";
+    const co = cols.find(c => c !== text && c !== date && uniq(c) >= 2 && uniq(c) <= 30 && avgLen(c) < 40) ?? "";
+    const opts = (sel, none) => (none ? `<option value="">— none —</option>` : "") + cols.map(c => `<option${c === sel ? " selected" : ""}>${esc(c)}</option>`).join("");
+    $("colText").innerHTML = opts(text, false); $("colDate").innerHTML = opts(date, true); $("colCo").innerHTML = opts(co, true);
+    $("fileInfo").textContent = `${f.name} · ${fmt(res.data.length)} rows${res.data.length > 2000 ? " (the first 2,000 will be analysed)" : ""}. Check the columns below.`;
+    showStep("map");
+  }});
+}
+
+const models = {};
+async function getModel(task, name, onProgress) {
+  models[name] ??= pipeline(task, name, { dtype: "q8", progress_callback: p => p.status === "progress" && p.file?.endsWith(".onnx") && onProgress(p.progress) });
+  return models[name];
+}
+const clean = s => String(s).replace(/@\w+/g, " ").replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim();
+
+$("analyse").onclick = async () => {
+  const cT = $("colText").value, cD = $("colDate").value, cC = $("colCo").value, K = +$("k").value;
+  const raw = parsed.rows.filter(r => String(r[cT] ?? "").trim()).slice(0, 2000);
+  if (raw.length < 20) { alert("Please upload at least 20 reviews."); return; }
+  $("analyse").disabled = $("back").disabled = true; $("prog").hidden = false;
+  const step = (s, txt, frac) => {
+    document.querySelectorAll(".prog .step").forEach(el => { const order = ["load", "sent", "emb", "group"];
+      el.classList.toggle("on", el.dataset.s === s); el.classList.toggle("done", order.indexOf(el.dataset.s) < order.indexOf(s)); });
+    if (txt != null) document.querySelector(`.prog [data-s="${s}"] .num`).textContent = txt;
+    if (frac != null) $("progBar").style.width = `${(frac * 100).toFixed(0)}%`;
+  };
+  try {
+    step("load", "", 0);
+    const [sentiment, embed] = await Promise.all([
+      getModel("text-classification", "sentiment-distilbert", p => step("load", `${p.toFixed(0)}%`, p / 100 * .2)),
+      getModel("feature-extraction", "embedder", () => {}),
+    ]);
+    const texts = raw.map(r => clean(r[cT]) || String(r[cT]));
+    const sents = [];
+    for (let i = 0; i < texts.length; i += 16) {
+      const out = await sentiment(texts.slice(i, i + 16));
+      sents.push(...out.map(o => [SENT.indexOf(o.label), Math.round(o.score * 100)]));
+      step("sent", `${fmt(Math.min(i + 16, texts.length))} / ${fmt(texts.length)}`, .2 + .45 * i / texts.length);
+    }
+    const negIdx = sents.map((s, i) => s[0] === 0 ? i : -1).filter(i => i >= 0);
+    const vecs = [];
+    for (let i = 0; i < negIdx.length; i += 32) {
+      const out = await embed(negIdx.slice(i, i + 32).map(j => texts[j]), { pooling: "mean", normalize: true });
+      vecs.push(...out.tolist());
+      step("emb", `${fmt(Math.min(i + 32, negIdx.length))} / ${fmt(negIdx.length)}`, .65 + .3 * i / Math.max(1, negIdx.length));
+    }
+    step("group", "", .97);
+    const k = Math.max(2, Math.min(K, Math.floor(negIdx.length / 20)));
+    const negTexts = negIdx.map(j => texts[j]);
+    let assign = negIdx.length >= 40 ? mergeSmall(vecs, kmeans(vecs, k)) : negIdx.map(() => 0);
+    // Topics that share their main keyword (e.g. two "bag" topics) become one. We measured that
+    // merging by meaning-distance would also merge delays with cancellations, so keywords decide.
+    assign = mergeSameKeyword(negTexts, assign);
+    const topics = nameTopics(negTexts, assign, Math.max(...assign) + 1);
+    const companies = cC ? [...new Set(raw.map(r => String(r[cC] ?? "").trim() || "Unknown"))].slice(0, 30) : [];
+    const topicOf = new Map(negIdx.map((j, n) => [j, assign[n]]));
+    D = { label: `Reviews from ${parsed.name}`, source: `${parsed.name} · ${fmt(raw.length)} reviews`, companies, topics, sample: false,
+          rows: raw.map((r, i) => ({ c: cC ? Math.max(0, companies.indexOf(String(r[cC] ?? "").trim() || "Unknown")) : 0,
+            t: cD && !isNaN(Date.parse(r[cD])) ? Date.parse(r[cD]) : 0, s: sents[i][0], conf: sents[i][1],
+            topic: topicOf.has(i) ? topicOf.get(i) : -1, text: String(r[cT]) })) };
+    step("group", "done", 1);
+    dlg.close(); start();
+  } catch (e) {
+    console.error(e); alert("Something went wrong while analysing the file. Try a smaller file or another browser.");
+    $("analyse").disabled = $("back").disabled = false;
+  }
+};
+
+// k-means on unit vectors (cosine similarity), with k-means++ starting points
+function kmeans(X, k, iters = 30) {
+  const n = X.length, d = X[0].length, dot = (a, b) => { let s = 0; for (let i = 0; i < d; i++) s += a[i] * b[i]; return s; };
+  const C = [X[Math.floor(Math.random() * n)].slice()];
+  while (C.length < k) {
+    const w = X.map(x => Math.max(0, 1 - Math.max(...C.map(c => dot(x, c)))) ** 2), tot = w.reduce((a, b) => a + b, 0);
+    let r = Math.random() * tot, i = 0; while ((r -= w[i]) > 0 && i < n - 1) i++; C.push(X[i].slice());
+  }
+  let A = new Array(n).fill(0);
+  for (let it = 0; it < iters; it++) {
+    const next = X.map(x => { let b = 0, bv = -2; C.forEach((c, j) => { const v = dot(x, c); if (v > bv) { bv = v; b = j; } }); return b; });
+    const moved = next.some((v, i) => v !== A[i]); A = next;
+    for (let j = 0; j < k; j++) {
+      const m = new Array(d).fill(0); let cnt = 0;
+      X.forEach((x, i) => { if (A[i] === j) { cnt++; for (let t = 0; t < d; t++) m[t] += x[t]; } });
+      if (cnt) { const norm = Math.hypot(...m) || 1; C[j] = m.map(v => v / norm); }
+    }
+    if (!moved && it > 0) break;
+  }
+  return A;   // which group each message belongs to
+}
+
+// Groups that are too small to be a real topic (under 3% of complaints) join their nearest topic.
+function mergeSmall(X, A) {
+  const n = X.length, d = X[0].length, min = Math.max(5, Math.round(n * .03));
+  const ids = [...new Set(A)], size = id => A.filter(a => a === id).length;
+  const big = ids.filter(id => size(id) >= min);
+  if (!big.length) return A.map(() => 0);
+  const centre = id => { const m = new Array(d).fill(0); X.forEach((x, i) => { if (A[i] === id) for (let t = 0; t < d; t++) m[t] += x[t]; });
+    const norm = Math.hypot(...m) || 1; return m.map(v => v / norm); };
+  const C = new Map(big.map(id => [id, centre(id)]));
+  const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+  const merged = A.map((a, i) => C.has(a) ? a : big.reduce((best, id) => dot(X[i], C.get(id)) > dot(X[i], C.get(best)) ? id : best, big[0]));
+  const relabel = new Map(big.map((id, j) => [id, j]));            // compact ids 0..k-1
+  return merged.map(a => relabel.get(a));
+}
+
+// Name each group by words that are both frequent in it AND distinctive to it:
+// score = p(word | group) × log(p(word | group) / p(word))
+const STOP = new Set(("the and for you your with that this have has had was were are not but they them their our from just get got can its all any out about what when will would " +
+  "there here been being one very also more some still now how why who which than then too really only into over after again back even need want like make made know going amp yes yet please " +
+  "thanks thank cant dont didnt wont im ive youre isnt wasnt doesnt couldnt wouldnt havent hasnt arent theyre thats whats lets ill weve said says could should does did doing done " +
+  "let guys lol gonna today yesterday tomorrow way okay well sure much many every something anything nothing someone anyone").split(" "));
+const PROFANE = /^(fuck\w*|shit\w*|damn\w*|crap\w*|bitch\w*|ass|asshole\w*|hell|wtf|stfu)$/;
+const stem = w => w.length > 4 ? w.replace(/(ies|es|s|ed|ing)$/, "") : w.replace(/s$/, "");   // bags -> bag, delayed -> delay
+
+function mergeSameKeyword(texts, assign) {
+  const k = Math.max(...assign) + 1, named = nameTopics(texts, assign, k);
+  const parent = named.map((_, j) => j), find = j => parent[j] === j ? j : (parent[j] = find(parent[j]));
+  named.forEach((a, i) => named.forEach((b, j) => {
+    if (j > i && a.keywords[0] !== "mixed" && stem(a.keywords[0]) === stem(b.keywords[0])) parent[find(j)] = find(i);
+  }));
+  const roots = [...new Set(named.map((_, j) => find(j)))], relabel = new Map(roots.map((r, n) => [r, n]));
+  return assign.map(a => relabel.get(find(a)));
+}
+
+function nameTopics(texts, assign, k) {
+  const tokens = texts.map(t => (t.toLowerCase().replace(/[’']/g, "").match(/[a-z]{3,}/g) || []).filter(w => !STOP.has(w) && !PROFANE.test(w)));
+  const per = Array.from({ length: k }, () => new Map()), total = new Map();
+  tokens.forEach((ws, i) => new Set(ws).forEach(w => { per[assign[i]].set(w, (per[assign[i]].get(w) || 0) + 1); total.set(w, (total.get(w) || 0) + 1); }));
+  const N = texts.length;
+  return per.map((m, j) => {
+    const size = Math.max(1, assign.filter(a => a === j).length);
+    const scored = [...m].filter(([, c]) => c >= 2).map(([w, c]) => { const p = c / size, q = total.get(w) / N; return [w, p * Math.log(p / q)]; })
+      .filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).map(([w]) => w);
+    const kw = [];
+    const sameWord = (a, b) => { const x = stem(a), y = stem(b); return x === y || (Math.min(x.length, y.length) >= 3 && (a.startsWith(y) || b.startsWith(x))); };
+    for (const w of scored) { if (kw.length === 5) break; if (!kw.some(x => sameWord(x, w))) kw.push(w); }   // no "bag" + "bags" / "baggage"
+    const cap = w => w[0].toUpperCase() + w.slice(1);
+    return { id: j, name: kw.length ? `${cap(kw[0])}${kw[1] ? " & " + kw[1] : ""}` : "Other complaints", keywords: kw.length ? kw : ["mixed"] };
+  });
+}
+
+loadSample().catch(e => { console.error(e); $("subtitle").textContent = "Couldn't load the data. Open this page through a web server."; });
+</script>
+</body>
+</html>
