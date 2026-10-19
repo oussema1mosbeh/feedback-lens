@@ -2,6 +2,8 @@
 
 **Thousands of customer reviews, read in a minute. What customers love, what they complain about, which problems are growing, and what they actually wrote.**
 
+### ▶ [Try it live: feedback-lens-omega.vercel.app](https://feedback-lens-omega.vercel.app)
+
 You upload a file of reviews, and an AI dashboard tells you the story behind them. Everything runs in your browser, so customer data never leaves your computer.
 
 ![Feedback Lens overview: sentiment mix, #1 issue, fastest-growing issue and an AI-written summary](docs/overview.png)
