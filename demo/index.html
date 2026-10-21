@@ -602,12 +602,17 @@ function renderChart(rows, B) {
   $("chartSub").textContent = topic ? `Complaints about ${topic.name.toLowerCase()} per ${B.unit}, and their trend` : `Messages per ${B.unit}, and how many are complaints`;
   $("barLegend").textContent = topic ? topic.name : "Messages";
   $("lineLegend").textContent = topic ? "Trend" : "Complaints";
-  const data = B.keys.map(k => {
+  let data = B.keys.map(k => {
     const g = rows.filter(r => B.key(r.t) === k), comp = g.filter(r => r.s === 0);
-    if (!topic) return { k, n: g.length, c: comp.length, neg: pct(comp.length, g.length) };
+    if (!topic) return { k, all: g.length, n: g.length, c: comp.length, neg: pct(comp.length, g.length) };
     const t = comp.filter(r => r.topic === topic.id).length;
-    return { k, n: t, c: t, neg: pct(t, comp.length) };
+    return { k, all: g.length, n: t, c: t, neg: pct(t, comp.length) };
   });
+  // Drop near-empty edge days (the data starts or stops mid-day): one message on the first day
+  // pulled the line down to zero and away from the columns.
+  const med = data.map(d => d.all).sort((a, b) => a - b)[data.length >> 1];
+  while (data.length > 2 && data[0].all < med * .2) data.shift();
+  while (data.length > 2 && data[data.length - 1].all < med * .2) data.pop();
   const W = 640, H = 230, L = 40, R = 16, T = 14, Bm = 28, iw = W - L - R, ih = H - T - Bm;
   const maxN = Math.max(...data.map(d => d.n), 1), bw = iw / data.length, base = T + ih;
   const x = i => L + bw * i + bw / 2, y1 = v => base - v / maxN * ih * .92, y2 = y1;
@@ -619,13 +624,16 @@ function renderChart(rows, B) {
     <defs>
       <linearGradient id="gBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B7C6DC"/><stop offset="1" stop-color="#E6ECF4"/></linearGradient>
       <linearGradient id="gBarOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FA5C6"/><stop offset="1" stop-color="#D3DCEA"/></linearGradient>
+      <linearGradient id="gComp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E5484D" stop-opacity=".30"/><stop offset="1" stop-color="#E5484D" stop-opacity=".08"/></linearGradient>
       <linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E5484D" stop-opacity=".22"/><stop offset="1" stop-color="#E5484D" stop-opacity="0"/></linearGradient>
     </defs>
     ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y1(v).toFixed(1)}" y2="${y1(v).toFixed(1)}" stroke="#EDF1F6" stroke-dasharray="3 5"/><text x="${L - 8}" y="${(y1(v) + 3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`).join("")}
     <line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" stroke="#E3E8F0"/>
     <g class="bars">${data.map((d, i) => `<rect data-i="${i}" x="${(x(i) - cw / 2).toFixed(1)}" y="${y1(d.n).toFixed(1)}" width="${cw.toFixed(1)}" height="${(base - y1(d.n)).toFixed(1)}" rx="${Math.min(8, cw / 2).toFixed(1)}" fill="url(#gBar)" style="animation-delay:${i * 45}ms"/>`).join("")}</g>
-    <path class="area" d="${curve}L${x(data.length - 1).toFixed(1)},${base}L${x(0).toFixed(1)},${base}Z" fill="url(#gArea)"/>
+    ${topic ? `<path class="area" d="${curve}L${x(data.length - 1).toFixed(1)},${base}L${x(0).toFixed(1)},${base}Z" fill="url(#gArea)"/>`
+      : `<g class="bars comp">${data.map((d, i) => `<rect x="${(x(i) - cw / 2).toFixed(1)}" y="${y1(d.c).toFixed(1)}" width="${cw.toFixed(1)}" height="${(base - y1(d.c)).toFixed(1)}" rx="${Math.min(8, cw / 2).toFixed(1)}" fill="url(#gComp)" style="animation-delay:${i * 45}ms"/>`).join("")}</g>`}
     <path class="curve" d="${curve}" pathLength="1" fill="none" stroke="var(--neg)" stroke-width="2.6" stroke-linecap="round"/>
+    <g class="pts">${pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#fff" stroke="var(--neg)" stroke-width="2"/>`).join("")}</g>
     ${data.map((d, i) => i % every ? "" : `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${B.label(d.k)}</text>`).join("")}
     <line class="guide" x1="0" x2="0" y1="${T}" y2="${base}" stroke="#9AA6BA" stroke-dasharray="3 4" opacity="0"/>
     <circle class="dot" r="5.5" fill="#fff" stroke="var(--neg)" stroke-width="2.6" opacity="0"/>
@@ -633,7 +641,7 @@ function renderChart(rows, B) {
   </svg>`;
 
   // hover: a soft guide line and a dot follow the mouse, and the day's column darkens
-  const svg = el.querySelector("svg"), tip = $("tip"), guide = svg.querySelector(".guide"), dot = svg.querySelector(".dot"), bars = svg.querySelectorAll(".bars rect");
+  const svg = el.querySelector("svg"), tip = $("tip"), guide = svg.querySelector(".guide"), dot = svg.querySelector(".dot"), bars = svg.querySelectorAll(".bars:not(.comp) rect");
   const hit = svg.querySelector(".hit");
   hit.addEventListener("mousemove", e => {
     const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * W;
