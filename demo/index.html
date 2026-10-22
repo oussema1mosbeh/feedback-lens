@@ -15,7 +15,7 @@
   --sans:'Manrope',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;--ease:cubic-bezier(.16,1,.3,1);--r:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bg)}
-body{font-family:var(--sans);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+body{font-family:var(--sans);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:calc(100vh / var(--z))}
 button,select,input{font:inherit;color:inherit}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
@@ -266,6 +266,9 @@ dialog::backdrop{background:rgba(11,31,58,.55);backdrop-filter:blur(3px)}
 @media (max-width:640px){.source{display:none}
   .issue{grid-template-columns:minmax(0,1fr) 58px}.issue .sparkcell{display:none}.map label{grid-template-columns:1fr}}
 @media print{.nav .btn,.filters,.search,dialog,.method{display:none!important}body{background:#fff}.card,.kpi{break-inside:avoid}.grid{grid-template-columns:1fr}.qlist{max-height:none}}
+/* big screens: scale the whole page up (x1.1 from 1800 px, x1.25 from 2200, x1.5 from 2800) */
+:root{--z:1}@media(min-width:1800px){:root{--z:1.1}}@media(min-width:2200px){:root{--z:1.25}}@media(min-width:2800px){:root{--z:1.5}}
+body{zoom:var(--z)}
 </style>
 </head>
 <body>
@@ -380,6 +383,7 @@ env.allowRemoteModels = false;
 env.localModelPath = new URL("./models/", location.href).href;
 
 const $ = id => document.getElementById(id);
+const uiZoom = () => parseFloat(getComputedStyle(document.body).zoom) || 1;   // CSS zoom on big screens
 const SENT = ["negative", "neutral", "positive"], SCOL = ["var(--neg)", "var(--neu)", "var(--pos)"];
 const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -654,8 +658,8 @@ function renderChart(rows, B) {
       : `${B.label(d.k)}<br><b>${fmt(d.n)}</b> messages<br><b>${fmt(d.c)}</b> complaints (${d.neg.toFixed(0)}%)`;
     // keep the popup on screen: flip to the left of the mouse near the right edge
     tip.style.opacity = 1;
-    const w = tip.offsetWidth, left = e.clientX + 16 + w > innerWidth - 8 ? e.clientX - w - 16 : e.clientX + 16;
-    tip.style.left = Math.max(8, left) + "px"; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight / 2) + "px";
+    const z = uiZoom(), w = tip.offsetWidth * z, left = e.clientX + 16 + w > innerWidth - 8 ? e.clientX - w - 16 : e.clientX + 16;
+    tip.style.left = Math.max(8, left) / z + "px"; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight * z / 2) / z + "px";
   });
   hit.addEventListener("mouseleave", () => { tip.style.opacity = 0; guide.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); bars.forEach(b => b.setAttribute("fill", "url(#gBar)")); });
 }
@@ -754,8 +758,8 @@ function renderHeat(issues) {
   };
   const place = (e, td) => { const b = td.getBoundingClientRect();
     tip.innerHTML = info(td); tip.style.opacity = 1;
-    const w = tip.offsetWidth, x = Math.min(innerWidth - w - 12, Math.max(12, b.left + b.width / 2 - w / 2));
-    tip.style.left = x + "px"; tip.style.top = (b.top - tip.offsetHeight - 10) + "px"; };
+    const z = uiZoom(), w = tip.offsetWidth * z, x = Math.min(innerWidth - w - 12, Math.max(12, b.left + b.width / 2 - w / 2));
+    tip.style.left = x / z + "px"; tip.style.top = (b.top - tip.offsetHeight * z - 10) / z + "px"; };
   table.onmouseover = e => { const td = e.target.closest("td.cell"); if (td) place(e, td); };
   table.onmouseleave = () => tip.style.opacity = 0;
   table.onfocusin = e => { const td = e.target.closest("td.cell"); if (td) place(e, td); };
